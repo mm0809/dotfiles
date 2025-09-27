@@ -14,3 +14,6 @@ vim.opt.virtualedit = "block"
 vim.opt.inccommand = "split"
 
 vim.opt.termguicolors = true
+
+-- opt for auto complete menu
+vim.opt.completeopt = { 'menu', 'menuone', 'noselect', 'fuzzy' }
