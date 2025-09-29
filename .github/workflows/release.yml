@@ -29,7 +29,7 @@ jobs:
 
       # Delete unnecessary data and Zip files
       - name: Prepare release
-        run: tar -czf release.tar.gz *
+        run: tar -czf release.tar.gz .
 
       # Release
       - name: Release
