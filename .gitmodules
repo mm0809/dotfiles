@@ -1,3 +1,6 @@
 [submodule "vim/site/pack/default/start/gruvbox.nvim"]
 	path = vim/site/pack/default/start/gruvbox.nvim
 	url = https://github.com/ellisonleao/gruvbox.nvim
+[submodule "vim/site/pack/default/start/fzf"]
+	path = vim/site/pack/default/start/fzf
+	url = https://github.com/junegunn/fzf
