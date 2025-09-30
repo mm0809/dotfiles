@@ -1,7 +1,7 @@
 -- LSP: config for clangd
 vim.lsp.config['clangd'] = {
     -- Command and arguments to start the server.
-    cmd = { '/home/zklin/program/clangd_20.1.8/bin/clangd' },
+    cmd = { clangd_path },
     -- Filetypes to automatically attach to.
     filetypes = { 'cpp', 'c', 'inc' },
     -- Sets the "workspace" to the directory where any of these files is found.
