@@ -1,14 +1,37 @@
 -- LSP: config for clangd
 vim.lsp.config['clangd'] = {
     -- Command and arguments to start the server.
-    cmd = { '/home/kuan/program/clangd_20.1.8/bin/clangd' },
+    cmd = { '/home/zklin/program/clangd_20.1.8/bin/clangd' },
     -- Filetypes to automatically attach to.
-    filetypes = { 'cpp', 'c' },
+    filetypes = { 'cpp', 'c', 'inc' },
     -- Sets the "workspace" to the directory where any of these files is found.
     -- Files that share a root directory will reuse the LSP server connection.
     -- Nested lists indicate equal priority, see |vim.lsp.Config|.
     root_markers = { 'compile_commands.json', '.git' },
 }
+vim.lsp.enable('clangd')
+
+vim.lsp.config['pyright'] = {
+    -- Command and arguments to start the server.
+    cmd = { 'pyright-langserver', '--stdio' },
+    -- Filetypes to automatically attach to.
+    filetypes = { 'python' },
+    -- Sets the "workspace" to the directory where any of these files is found.
+    -- Files that share a root directory will reuse the LSP server connection.
+    -- Nested lists indicate equal priority, see |vim.lsp.Config|.
+    root_markers = { 'requirements.txt', 'setup.py', '.git' },
+    settings = {
+        python = {
+            analysis = {
+                autoSearchPaths = true,
+                useLibraryCodeForTypes = true,
+                diagnosticMode = 'openFilesOnly',
+            },
+        },
+    },
+}
+
+vim.lsp.enable('pyright')
 vim.lsp.enable('clangd')
 
 -- LSP: keybindings
@@ -29,7 +52,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
         vim.keymap.set('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<cr>', opts)
         vim.keymap.set('n', 'gt', '<cmd>lua vim.lsp.buf.type_definition()<cr>', opts)
         vim.keymap.set('n', 'gr', '<cmd>lua vim.lsp.buf.references()<cr>', opts)
-        -- vim.keymap.set('n', 'gs', '<cmd>lua vim.lsp.buf.signature_help()<cr>', opts)
+        vim.keymap.set('i', '<C-k>', '<cmd>lua vim.lsp.buf.signature_help()<cr>', opts)
         -- vim.keymap.set('n', '<F2>', '<cmd>lua vim.lsp.buf.rename()<cr>', opts)
         -- vim.keymap.set({'n', 'x'}, '<F3>', '<cmd>lua vim.lsp.buf.format({async = true})<cr>', opts)
         -- vim.keymap.set('n', '<F4>', '<cmd>lua vim.lsp.buf.code_action()<cr>', opts)
