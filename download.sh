@@ -3,6 +3,7 @@ mkdir -p downloads
 
 wget -P downloads/ https://github.com/junegunn/fzf/releases/download/v0.65.2/fzf-0.65.2-linux_amd64.tar.gz
 wget -P downloads/ https://github.com/neovim/neovim/releases/download/v0.11.4/nvim-linux-x86_64.tar.gz
+wget -P downloads/ https://github.com/jesseduffield/lazygit/releases/download/v0.55.1/lazygit_0.55.1_linux_x86_64.tar.gz
 wget -P downloads/ https://mirror.ossplanet.net/gnu/global/global-6.6.14.tar.gz
 
 # Don't download clangd in default
