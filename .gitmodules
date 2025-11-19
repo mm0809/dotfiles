@@ -4,3 +4,6 @@
 [submodule "vim/site/pack/default/start/fzf"]
 	path = vim/site/pack/default/start/fzf
 	url = https://github.com/junegunn/fzf
+[submodule "vim/site/pack/default/start/tokyonight.nvim"]
+	path = vim/site/pack/default/start/tokyonight.nvim
+	url = https://github.com/folke/tokyonight.nvim
