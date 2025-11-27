@@ -9,7 +9,6 @@ vim.lsp.config['clangd'] = {
     -- Nested lists indicate equal priority, see |vim.lsp.Config|.
     root_markers = { 'compile_commands.json', '.git' },
 }
-vim.lsp.enable('clangd')
 
 vim.lsp.config['pyright'] = {
     -- Command and arguments to start the server.
