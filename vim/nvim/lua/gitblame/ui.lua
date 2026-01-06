@@ -32,4 +32,55 @@ function M.render_buffer(bufnr, lines)
     vim.api.nvim_set_option_value('modifiable', false, {buf = bufnr})
 end
 
+---Create a floating window with the given configuration.
+---@param lines table Array of lines to display
+---@param opts table|nil Configuration options (width, height, relative, border, filetype)
+---@return integer bufnr Buffer number
+---@return integer winnr Window ID
+function M.create_floating_window(lines, opts)
+    opts = opts or {}
+
+    -- Default configuration
+    local width = opts.width or 80
+    local height = opts.height or math.min(#lines + 2, 20)
+    local relative = opts.relative or 'editor'
+    local border = opts.border or 'rounded'
+
+    -- Calculate centered position
+    local ui_width = vim.o.columns
+    local ui_height = vim.o.lines
+    local col = math.floor((ui_width - width) / 2)
+    local row = math.floor((ui_height - height) / 2)
+
+    -- Ensure positive offsets
+    col = math.max(0, col)
+    row = math.max(0, row)
+
+    -- Create floating buffer and set content
+    local buf = M.create_buffer('nofile', opts.filetype, nil)
+    M.render_buffer(buf, lines)
+
+    -- Create floating window
+    local win_config = {
+        relative = relative,
+        width = width,
+        height = height,
+        col = col,
+        row = row,
+        style = 'minimal',
+        border = border,
+        zindex = 1000,
+    }
+
+    local win = vim.api.nvim_open_win(buf, true, win_config)
+
+    -- Apply window options
+    vim.api.nvim_set_option_value('cursorline', false, {win = win})
+    vim.api.nvim_set_option_value('number', false, {win = win})
+    vim.api.nvim_set_option_value('relativenumber', false, {win = win})
+    vim.api.nvim_set_option_value('wrap', true, {win = win})
+
+    return buf, win
+end
+
 return M
