@@ -1,9 +1,30 @@
+-- ============================================================================
+-- Gitblame Plugin - Main Module
+-- ============================================================================
+-- A Neovim plugin for viewing git blame in a split window with time-travel
+-- capabilities and commit detail viewing.
+--
+-- Features:
+--   - Split window git blame viewer
+--   - Time-travel: press '-' to view blame before a commit
+--   - Commit details: press '<CR>' to view commit in floating window
+--   - Configurable window position and appearance
+--
+-- Usage:
+--   require('gitblame').setup()
+--   Then use <leader>gb or :Gitblame command
+-- ============================================================================
+
 local util = require('gitblame.util')
 local ui = require('gitblame.ui')
 
 util.enable_log()
 
 local M = {}
+
+-- ============================================================================
+-- State Management
+-- ============================================================================
 
 local state = {
     filepath = nil,
@@ -15,6 +36,10 @@ local state = {
     floating_win = nil
 }
 
+-- ============================================================================
+-- Configuration
+-- ============================================================================
+
 local config = {
     git_blame_args = {'--date=short'},
     window = {
@@ -23,40 +48,47 @@ local config = {
         focus_on_open = true    -- Focus blame window after opening
     },
     floating_window = {
-        width = 90,             -- Column width for floating window
-        max_height = 40,        -- Maximum height (will auto-adjust to content)
-        border = 'rounded',     -- Border style: 'none', 'single', 'double', 'rounded', 'solid'
-        relative = 'editor'     -- Position relative to: 'editor', 'cursor', 'win'
+        width = 90,
+        max_height = 40,
+        border = 'rounded',     -- 'none', 'single', 'double', 'rounded', 'solid'
+        relative = 'editor'     -- 'editor', 'cursor', 'win'
     }
 }
+
+-- ============================================================================
+-- Validation and Initialization
+-- ============================================================================
 
 local function init()
     state.filepath = vim.fn.expand('%:p')
 
     if state.filepath == nil or state.filepath == '' then
-        vim.notify('Error: No file in current buffer.', vim.log.levels.ERROR)
-        return
+        vim.notify('Error: No file in current buffer', vim.log.levels.ERROR)
+        return false
     end
 
     if vim.fn.filereadable(state.filepath) == 0 then
         vim.notify('Error: File is not readable', vim.log.levels.ERROR)
-        return
+        return false
     end
 
     if vim.fn.executable('git') == 0 then
-        vim.notify('Error: git executable not found in PATH.', vim.log.levels.ERROR)
-        return
+        vim.notify('Error: git executable not found in PATH', vim.log.levels.ERROR)
+        return false
     end
 
     state.source_buf = vim.api.nvim_get_current_buf()
     state.source_win = vim.api.nvim_get_current_win()
+    return true
 end
 
+-- ============================================================================
+-- Window Management
+-- ============================================================================
+
 local function open_blame_window(buf)
-    -- Store current window for potential focus restoration
     local current_win = vim.api.nvim_get_current_win()
 
-    -- Dynamic split command based on position config
     local split_cmd = config.window.position == 'right'
         and 'rightbelow vsplit'
         or 'leftabove vsplit'
@@ -65,21 +97,22 @@ local function open_blame_window(buf)
     state.blame_win = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(state.blame_win, buf)
 
-    -- Apply window options
     vim.api.nvim_set_option_value('number', false, { win = state.blame_win })
     vim.api.nvim_set_option_value('relativenumber', false, { win = state.blame_win })
     vim.api.nvim_set_option_value('wrap', false, { win = state.blame_win })
 
-    -- Apply width if configured
     if config.window.width and config.window.width > 0 then
         pcall(vim.cmd, string.format('vertical resize %d', config.window.width))
     end
 
-    -- Restore focus to source window if needed
     if not config.window.focus_on_open then
         vim.api.nvim_set_current_win(current_win)
     end
 end
+
+-- ============================================================================
+-- Git Blame Operations
+-- ============================================================================
 
 local function show_blame(hash)
     local cwd = vim.fn.fnamemodify(state.filepath, ':h')
@@ -124,6 +157,10 @@ local function show_blame_before()
     show_blame(hash)
 end
 
+-- ============================================================================
+-- Floating Window (Commit Details)
+-- ============================================================================
+
 local function close_floating_window()
     util.log('close_floating_window')
 
@@ -140,19 +177,17 @@ local function show_commit_details()
     local hash = get_commit_hash(get_current_blame_line())
 
     if not hash then
-        vim.notify('Could not extract commit hash from blame line', vim.log.levels.WARN)
+        vim.notify('Error: Could not extract commit hash from blame line', vim.log.levels.WARN)
         return
     end
 
     util.log('Showing commit details for hash', hash)
 
-    -- Close existing floating window if open
     close_floating_window()
 
     local cwd = vim.fn.fnamemodify(state.filepath, ':h')
     local cmd = {'git', 'show', hash}
 
-    -- Show loading message
     local loading_lines = {'Loading commit details...'}
     state.floating_buf, state.floating_win = ui.create_floating_window(loading_lines, {
         filetype = 'git',
@@ -162,7 +197,6 @@ local function show_commit_details()
         relative = config.floating_window.relative,
     })
 
-    -- Set up keymap to close floating window
     vim.keymap.set('n', 'q', close_floating_window, {
         buffer = state.floating_buf,
         noremap = true,
@@ -180,7 +214,6 @@ local function show_commit_details()
             local lines = util.str_to_table(output)
             ui.render_buffer(state.floating_buf, lines)
 
-            -- Adjust window height to content
             if state.floating_win and vim.api.nvim_win_is_valid(state.floating_win) then
                 local new_height = math.min(#lines + 2, config.floating_window.max_height)
                 vim.api.nvim_win_set_height(state.floating_win, new_height)
@@ -189,12 +222,14 @@ local function show_commit_details()
     end)
 end
 
+-- ============================================================================
+-- Buffer Setup
+-- ============================================================================
+
 local function create_blame_buffer()
     util.log('create_blame_buffer')
-    -- TODO: there is no gitblame filetype
-    local bufnr = ui.create_buffer('nofile', 'gitblame', 'gitblame://output')
+    local bufnr = ui.create_buffer('nofile', 'git', 'gitblame://output')
 
-    -- Set up keymap to show blame before commit
     vim.keymap.set('n', '-', show_blame_before, {
         buffer = bufnr,
         noremap = true,
@@ -202,7 +237,6 @@ local function create_blame_buffer()
         desc = 'Show blame before this commit',
     })
 
-    -- Set up keymap to show commit details
     vim.keymap.set('n', '<CR>', show_commit_details, {
         buffer = bufnr,
         noremap = true,
@@ -213,24 +247,27 @@ local function create_blame_buffer()
     state.blame_buf = bufnr
 end
 
+-- ============================================================================
+-- Main Entry Point
+-- ============================================================================
+
 local function git_blame()
-    util.log('show_blame')
+    util.log('git_blame')
 
-    -- 0. init state
-    init()
+    if not init() then
+        return
+    end
 
-    -- 1. create blame buffer
     create_blame_buffer()
-
-    -- 2. open blame window
     open_blame_window(state.blame_buf)
-
-    -- 3. get blame messages and show on buffer
     show_blame()
 end
 
+-- ============================================================================
+-- Plugin Setup
+-- ============================================================================
+
 function M.setup(opts)
-    -- Merge user config with defaults
     config = vim.tbl_deep_extend('force', config, opts or {})
 
     util.log('Setup')

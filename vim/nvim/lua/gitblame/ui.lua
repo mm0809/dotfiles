@@ -1,9 +1,16 @@
+-- ============================================================================
+-- Gitblame Plugin - UI Utilities
+-- ============================================================================
+-- Provides utility functions for creating and managing buffers and windows.
+-- ============================================================================
+
 local M = {}
----Create a scratch buffer with standard options.
+
+---Create a scratch buffer with standard options
 ---@param buftype string Buffer type (e.g., 'nofile')
 ---@param filetype string|nil Filetype to set
 ---@param name string|nil Buffer name
----@return integer bufnr
+---@return integer bufnr Buffer number
 function M.create_buffer(buftype, filetype, name)
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_set_option_value('buftype', buftype, {buf = buf})
@@ -22,6 +29,9 @@ function M.create_buffer(buftype, filetype, name)
     return buf
 end
 
+---Render lines to a buffer
+---@param bufnr integer Buffer number
+---@param lines table Array of lines to display
 function M.render_buffer(bufnr, lines)
     if not vim.api.nvim_buf_is_valid(bufnr) then
         return
@@ -32,7 +42,7 @@ function M.render_buffer(bufnr, lines)
     vim.api.nvim_set_option_value('modifiable', false, {buf = bufnr})
 end
 
----Create a floating window with the given configuration.
+---Create a centered floating window
 ---@param lines table Array of lines to display
 ---@param opts table|nil Configuration options (width, height, relative, border, filetype)
 ---@return integer bufnr Buffer number
@@ -40,27 +50,19 @@ end
 function M.create_floating_window(lines, opts)
     opts = opts or {}
 
-    -- Default configuration
     local width = opts.width or 80
     local height = opts.height or math.min(#lines + 2, 20)
     local relative = opts.relative or 'editor'
     local border = opts.border or 'rounded'
 
-    -- Calculate centered position
     local ui_width = vim.o.columns
     local ui_height = vim.o.lines
-    local col = math.floor((ui_width - width) / 2)
-    local row = math.floor((ui_height - height) / 2)
+    local col = math.max(0, math.floor((ui_width - width) / 2))
+    local row = math.max(0, math.floor((ui_height - height) / 2))
 
-    -- Ensure positive offsets
-    col = math.max(0, col)
-    row = math.max(0, row)
-
-    -- Create floating buffer and set content
     local buf = M.create_buffer('nofile', opts.filetype, nil)
     M.render_buffer(buf, lines)
 
-    -- Create floating window
     local win_config = {
         relative = relative,
         width = width,
@@ -74,7 +76,6 @@ function M.create_floating_window(lines, opts)
 
     local win = vim.api.nvim_open_win(buf, true, win_config)
 
-    -- Apply window options
     vim.api.nvim_set_option_value('cursorline', false, {win = win})
     vim.api.nvim_set_option_value('number', false, {win = win})
     vim.api.nvim_set_option_value('relativenumber', false, {win = win})
