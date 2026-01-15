@@ -36,6 +36,13 @@ local state = {
     floating_win = nil
 }
 
+local sync_state = {
+    syncing = false,      -- Prevents infinite recursion
+    enabled = false,      -- Whether sync is currently active
+    source_autocmd = nil, -- Autocmd ID for source window
+    blame_autocmd = nil   -- Autocmd ID for blame window
+}
+
 -- ============================================================================
 -- Configuration
 -- ============================================================================
@@ -52,6 +59,10 @@ local config = {
         max_height = 40,
         border = 'rounded',     -- 'none', 'single', 'double', 'rounded', 'solid'
         relative = 'editor'     -- 'editor', 'cursor', 'win'
+    },
+    sync = {
+        enabled = true,         -- Enable cursor sync by default
+        insert_mode = false     -- Don't sync in insert mode
     }
 }
 
@@ -111,6 +122,128 @@ local function open_blame_window(buf)
 end
 
 -- ============================================================================
+-- Cursor Synchronization
+-- ============================================================================
+
+---Synchronize cursor position from source window to blame window (or vice versa)
+---@param from_source boolean True if syncing from source to blame
+local function sync_cursor(from_source)
+    -- Guard: Check if sync is enabled and not already syncing
+    if not sync_state.enabled or sync_state.syncing then
+        return
+    end
+
+    -- Guard: Validate both windows exist
+    if not state.source_win or not vim.api.nvim_win_is_valid(state.source_win) then
+        return
+    end
+    if not state.blame_win or not vim.api.nvim_win_is_valid(state.blame_win) then
+        return
+    end
+
+    -- Get current window (the one user is in)
+    local current_win = vim.api.nvim_get_current_win()
+
+    -- Determine source and target windows
+    local source_win = from_source and state.source_win or state.blame_win
+    local target_win = from_source and state.blame_win or state.source_win
+    local target_buf = from_source and state.blame_buf or state.source_buf
+
+    -- Get cursor position from source window
+    local ok, cursor = pcall(vim.api.nvim_win_get_cursor, source_win)
+    if not ok then
+        return
+    end
+
+    local row = cursor[1]
+
+    -- Guard: Check if target line exists
+    local target_line_count = vim.api.nvim_buf_line_count(target_buf)
+    if row > target_line_count then
+        row = target_line_count
+    end
+
+    -- Set sync flag to prevent infinite loop
+    sync_state.syncing = true
+
+    -- Set cursor in target window without triggering autocmds
+    pcall(function()
+        vim.api.nvim_win_set_cursor(target_win, {row, 0})
+    end)
+
+    -- Restore sync flag
+    sync_state.syncing = false
+
+    -- Ensure we stay in the window user was in
+    if vim.api.nvim_win_is_valid(current_win) then
+        vim.api.nvim_set_current_win(current_win)
+    end
+end
+
+---Cleanup cursor synchronization autocmds
+local function cleanup_cursor_sync()
+    -- Delete autocmds if they exist
+    if sync_state.source_autocmd then
+        pcall(vim.api.nvim_del_autocmd, sync_state.source_autocmd)
+        sync_state.source_autocmd = nil
+    end
+
+    if sync_state.blame_autocmd then
+        pcall(vim.api.nvim_del_autocmd, sync_state.blame_autocmd)
+        sync_state.blame_autocmd = nil
+    end
+
+    -- Clear augroup
+    pcall(vim.api.nvim_clear_autocmds, {group = 'GitblameCursorSync'})
+
+    sync_state.enabled = false
+    util.log('Cursor sync disabled')
+end
+
+---Setup cursor synchronization autocmds
+local function setup_cursor_sync()
+    -- Don't setup if sync is disabled in config
+    if not config.sync.enabled then
+        return
+    end
+
+    -- Clear any existing autocmds
+    cleanup_cursor_sync()
+
+    -- Create augroup for sync
+    local group = vim.api.nvim_create_augroup('GitblameCursorSync', {clear = true})
+
+    -- Events to listen for
+    local events = {'CursorMoved'}
+    if config.sync.insert_mode then
+        table.insert(events, 'CursorMovedI')
+    end
+
+    -- Setup autocmd for source window
+    sync_state.source_autocmd = vim.api.nvim_create_autocmd(events, {
+        group = group,
+        buffer = state.source_buf,
+        callback = function()
+            sync_cursor(true)  -- Sync from source to blame
+        end,
+        desc = 'Sync cursor from source to blame window'
+    })
+
+    -- Setup autocmd for blame window
+    sync_state.blame_autocmd = vim.api.nvim_create_autocmd(events, {
+        group = group,
+        buffer = state.blame_buf,
+        callback = function()
+            sync_cursor(false)  -- Sync from blame to source
+        end,
+        desc = 'Sync cursor from blame to source window'
+    })
+
+    sync_state.enabled = true
+    util.log('Cursor sync enabled')
+end
+
+-- ============================================================================
 -- Git Blame Operations
 -- ============================================================================
 
@@ -135,6 +268,14 @@ local function show_blame(hash)
         vim.schedule(function()
             local lines = util.str_to_table(obj.code == 0 and obj.stdout or obj.stderr)
             ui.render_buffer(state.blame_buf, lines)
+
+            -- Re-sync cursor after blame updates
+            if sync_state.enabled then
+                -- Wait a tiny bit for buffer to settle
+                vim.defer_fn(function()
+                    sync_cursor(true)  -- Sync from source to blame
+                end, 10)
+            end
         end)
     end
 
@@ -244,6 +385,33 @@ local function create_blame_buffer()
         desc = 'Show commit details in floating window',
     })
 
+    -- Add sync toggle keymap
+    vim.keymap.set('n', 's', function()
+        if sync_state.enabled then
+            cleanup_cursor_sync()
+            vim.notify('Cursor sync disabled', vim.log.levels.INFO)
+        else
+            setup_cursor_sync()
+            vim.notify('Cursor sync enabled', vim.log.levels.INFO)
+        end
+    end, {
+        buffer = bufnr,
+        noremap = true,
+        silent = true,
+        desc = 'Toggle cursor synchronization',
+    })
+
+    -- Setup autocmd to cleanup when blame buffer is hidden/closed
+    vim.api.nvim_create_autocmd({'BufWipeout', 'BufDelete', 'BufUnload'}, {
+        buffer = bufnr,
+        callback = function()
+            cleanup_cursor_sync()
+            util.log('Blame buffer closed, sync cleaned up')
+        end,
+        once = true,
+        desc = 'Cleanup cursor sync when blame closes'
+    })
+
     state.blame_buf = bufnr
 end
 
@@ -261,6 +429,9 @@ local function git_blame()
     create_blame_buffer()
     open_blame_window(state.blame_buf)
     show_blame()
+
+    -- Setup cursor sync after windows are created
+    setup_cursor_sync()
 end
 
 -- ============================================================================

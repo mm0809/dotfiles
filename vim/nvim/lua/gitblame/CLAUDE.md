@@ -8,11 +8,14 @@ A custom Neovim plugin that displays git blame information in a split window wit
 
 **Location**: `vim/nvim/lua/gitblame/`
 
-**Total size**: ~221 lines across 3 files
+**Total size**: ~450 lines across 3 files
 
 **Main Features**:
 - Split window git blame viewer (left side)
+- **Bidirectional cursor synchronization** (moves in sync with source file)
 - Press `-` in blame window to show blame **before** a commit (time-travel)
+- Press `<CR>` to view commit details in floating window
+- Press `s` to toggle cursor sync on/off
 - Async git operations (non-blocking UI)
 - Simple, modular architecture
 
@@ -137,6 +140,39 @@ show_blame(hash) runs 'git blame <hash>^'
 Blame window shows parent commit's blame
 ```
 
+### Cursor Synchronization Flow
+
+```
+User moves cursor in source window
+    ↓
+CursorMoved autocmd fires on source buffer
+    ↓
+sync_cursor(true) called
+    ↓
+Check: sync enabled? not already syncing?
+    ↓
+Get cursor position from source window
+    ↓
+Set sync_state.syncing = true (prevent infinite loop)
+    ↓
+Set cursor in blame window to same line
+    ↓
+Set sync_state.syncing = false
+```
+
+**Bidirectional**: Same flow works in reverse (blame → source)
+
+**Infinite Loop Prevention**: The `sync_state.syncing` flag prevents autocmd recursion:
+1. Moving cursor in window A sets `syncing = true`
+2. Cursor moves in window B (autocmd fires but sync is skipped because `syncing = true`)
+3. Flag resets to `false`
+4. Next user movement triggers sync normally
+
+**Edge Case Handling**:
+- If blame has fewer lines than source, cursor position is capped to blame line count
+- If windows are invalid, sync safely returns without errors
+- After time-travel updates, cursor re-syncs to maintain position
+
 ## Key Implementation Details
 
 ### Async Git Execution
@@ -229,6 +265,24 @@ util.disable_log()  -- Disable debug logs
 
 Debug logs appear via `vim.notify` with DEBUG level.
 
+### Cursor Synchronization
+Configure cursor sync behavior in setup call:
+
+```lua
+require('gitblame').setup({
+    sync = {
+        enabled = true,         -- Enable cursor sync by default
+        insert_mode = false     -- Don't sync in insert mode
+    }
+})
+```
+
+Options:
+- `enabled`: Enable/disable cursor sync on plugin startup (default: true)
+- `insert_mode`: Sync cursor in insert mode too (default: false)
+
+Toggle sync at runtime by pressing `s` in the blame buffer.
+
 ## Keybindings
 
 ### Global (after setup)
@@ -236,6 +290,8 @@ Debug logs appear via `vim.notify` with DEBUG level.
 
 ### In Blame Buffer
 - `-`: Show blame **before** current commit (time-travel)
+- `<CR>`: Show commit details in floating window
+- `s`: Toggle cursor synchronization on/off
 
 ## Commands
 
@@ -393,9 +449,7 @@ require('gitblame').setup()
 ## Limitations
 
 **Current Implementation**:
-- No cursor synchronization between source and blame windows
 - No inline blame annotations (virtual text)
-- No commit detail viewer
 - Time-travel doesn't show historical file content (only blame)
 - No syntax highlighting for blame output
 - Window position fixed to left (not configurable)
@@ -408,8 +462,6 @@ require('gitblame').setup()
 ## Future Enhancement Ideas
 
 - Configurable window position (left/right/bottom)
-- Cursor synchronization between source and blame
-- Commit detail floating window (press `<CR>` on blame line)
 - Virtual text blame annotations (inline in source)
 - Syntax highlighting for blame output (highlight commits, dates, authors)
 - Auto-close blame when source buffer closes
