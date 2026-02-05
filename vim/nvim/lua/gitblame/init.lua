@@ -18,8 +18,6 @@
 local util = require('gitblame.util')
 local ui = require('gitblame.ui')
 
-util.enable_log()
-
 local M = {}
 
 -- ============================================================================
@@ -98,8 +96,6 @@ end
 -- ============================================================================
 
 local function open_blame_window(buf)
-    local current_win = vim.api.nvim_get_current_win()
-
     local split_cmd = config.window.position == 'right'
         and 'rightbelow vsplit'
         or 'leftabove vsplit'
@@ -116,9 +112,7 @@ local function open_blame_window(buf)
         pcall(vim.cmd, string.format('vertical resize %d', config.window.width))
     end
 
-    if not config.window.focus_on_open then
-        vim.api.nvim_set_current_win(current_win)
-    end
+    vim.api.nvim_set_current_win(state.source_win)
 end
 
 -- ============================================================================
@@ -273,6 +267,7 @@ local function show_blame(hash)
             if sync_state.enabled then
                 -- Wait a tiny bit for buffer to settle
                 vim.defer_fn(function()
+                    vim.api.nvim_set_current_win(state.blame_win)
                     sync_cursor(true)  -- Sync from source to blame
                 end, 10)
             end
