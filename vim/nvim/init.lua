@@ -17,6 +17,15 @@ vim.keymap.set('v', '<leader>p', '"_dP')
 
 vim.keymap.set('n', '<C-p>', ':FZF<CR>')
 
+-- Map Esc to exit terminal mode
+vim.keymap.set('t', '<Esc>', '<C-\\><C-n>', { silent = true })
+
+-- Map Ctrl+W + h/j/k/l to switch windows while in terminal mode
+vim.keymap.set('t', '<C-w>h', '<C-\\><C-n><C-w>h', { silent = true })
+vim.keymap.set('t', '<C-w>j', '<C-\\><C-n><C-w>j', { silent = true })
+vim.keymap.set('t', '<C-w>k', '<C-\\><C-n><C-w>k', { silent = true })
+vim.keymap.set('t', '<C-w>l', '<C-\\><C-n><C-w>l', { silent = true })
+
 local function reload_plugin(plugin_name)
     -- 1. unload relate module
     for module_name, _ in pairs(package.loaded) do
