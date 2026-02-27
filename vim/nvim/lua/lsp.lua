@@ -10,6 +10,18 @@ vim.lsp.config['clangd'] = {
     root_markers = { 'compile_commands.json', '.git' },
 }
 
+vim.lsp.config['ruff'] = {
+    cmd = { 'ruff', 'server' },
+    filetypes = { 'python' },
+    root_markers = { 'pyproject.toml', 'ruff.toml', '.ruff.toml', '.git' },
+    settings = {},
+    -- init_options = {
+    --     settings = {
+    --         -- Ruff language server settings go here
+    --     }
+    -- }
+}
+
 vim.lsp.config['pyright'] = {
     -- Command and arguments to start the server.
     cmd = { 'pyright-langserver', '--stdio' },
@@ -97,6 +109,7 @@ vim.lsp.config('lua_ls', {
 
 
 vim.lsp.enable('pyright')
+vim.lsp.enable('ruff')
 vim.lsp.enable('clangd')
 vim.lsp.enable('lua_ls')
 
