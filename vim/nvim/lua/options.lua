@@ -19,3 +19,9 @@ vim.opt.termguicolors = true
 
 -- opt for auto complete menu
 vim.opt.completeopt = { 'menu', 'menuone', 'noselect', 'fuzzy' }
+
+-- swap file
+vim.opt.swapfile = false
+vim.opt.backup = false
+vim.opt.undofile = true
+vim.opt.undodir = vim.fn.expand("~/.local/state/nvim/undo")
